@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Véhicules ───────────────────────────────────────────────────────────────
+
+model Vehicle {
+  id              String        @id @default(cuid())
+
+  // ── Identification (A, D, E) ─────────────────────────────────────────────
+  vin             String?       @unique          // E  — Numéro VIN
+  immatriculation String?                        // A  — Numéro d'immatriculation
+  numeroFormule   String?                        //    — Numéro de formule (haut droite CG)
+  marque          String                         // D.1 — Marque
+  modele          String                         // D.3 — Dénomination commerciale
+  version         String?                        // D.2 — Type / variante / version
+  annee           Int                            //    — Année modèle
+  couleur         String?                        // R  — Couleur
+
+  // ── Mise en circulation ───────────────────────────────────────────────────
+  datePremiereCirculation DateTime?              // B  — Date 1ère mise en circulation
+
+  // ── Catégorie & carrosserie (J) ───────────────────────────────────────────
+  categorieVehicule String?                      // J  — Catégorie EU (M1, N1, L1e…)
+  carrosserie       Carrosserie?                 // J.1/J.3 — Type de carrosserie
+  nbPortes          Int?                         //    — Nombre de portes
+
+  // ── Motorisation (P) ─────────────────────────────────────────────────────
+  carburant         Carburant   @default(ESSENCE) // P.3 — Source d'énergie
+  cylindree         Int?                          // P.1 — Cylindrée (cm³)
+  puissanceKw       Int?                          // P.2 — Puissance nette max (kW)
+  puissanceCv       Int?                          //    — Puissance DIN (ch)
+  puissanceFiscale  Int?                          // P.4 — Puissance fiscale (CV fiscaux)
+  numeroMoteur      String?                       // P.5 — Numéro d'identification moteur
+  boite             Boite       @default(MANUELLE) //    — Type de boîte
+
+  // ── Masses (F, G) ─────────────────────────────────────────────────────────
+  ptac              Int?                          // F.1 — PTAC (kg)
+  ptra              Int?                          // F.3 — PTRA (kg)
+  poidsVide         Int?                          // G   — Masse en ordre de marche (kg)
+
+  // ── Dimensions & essieux (L, M) ──────────────────────────────────────────
+  empattement       Int?                          // M   — Empattement (mm)
+  nombreEssieux     Int?                          // L   — Nombre d'essieux
+
+  // ── Capacité (S) ─────────────────────────────────────────────────────────
+  nombrePlaces      Int?                          // S.1 — Nb places assises (conducteur incl.)
+  nombrePlacesDebout Int?                         // S.2 — Nb places debout
+
+  // ── Performances (T) ─────────────────────────────────────────────────────
+  vitesseMax        Int?                          // T   — Vitesse max (km/h)
+  kilometrage       Int
+
+  // ── Émissions (V) ────────────────────────────────────────────────────────
+  co2               Int?                          // V.7 — Émissions CO₂ (g/km)
+  normeEuro         String?                       // V.9 — Norme antipollution (Euro 6d…)
+
+  // ── Réception (K) ────────────────────────────────────────────────────────
+  numeroReception   String?                       // K   — N° réception par type
+
+  // ── Commercial ───────────────────────────────────────────────────────────
+  prixAchat         Float
+  prixVente         Float?
+  statut            VehicleStatus @default(EN_STOCK)
+  notesInternes     String?
+  dateAchat         DateTime      @default(now())
+  dateVente         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  photos       VehiclePhoto[]
+  costs        VehicleCost[]
+  registration Registration?
+  sale         Sale?
+}
+
+model VehiclePhoto {
+  id        String   @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  url       String
+  thumbUrl  String?
+  isPrimary Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+model VehicleCost {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  type        CostType
+  description String
+  montant     Float
+  date        DateTime @default(now())
+  factureUrl  String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── Clients ─────────────────────────────────────────────────────────────────
+
+model Customer {
+  id         String       @id @default(cuid())
+  type       CustomerType @default(PARTICULIER)
+  civilite   String?
+  prenom     String?
+  nom        String
+  societe    String?
+  siret      String?
+  email      String?
+  telephone  String?
+  adresse    String?
+  codePostal String?
+  ville      String?
+  notes      String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  sales Sale[]
+}
+
+// ─── Ventes ──────────────────────────────────────────────────────────────────
+
+model Sale {
+  id           String    @id @default(cuid())
+  vehicleId    String    @unique
+  vehicle      Vehicle   @relation(fields: [vehicleId], references: [id])
+  customerId   String
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  prixVente    Float
+  dateVente    DateTime  @default(now())
+  registration Registration?
+}
+
+// ─── Carte grise ─────────────────────────────────────────────────────────────
+
+model Registration {
+  id            String             @id @default(cuid())
+  vehicleId     String             @unique
+  vehicle       Vehicle            @relation(fields: [vehicleId], references: [id])
+  saleId        String?            @unique
+  sale          Sale?              @relation(fields: [saleId], references: [id])
+  statut        RegistrationStatus @default(A_CONSTITUER)
+  numeroDossier String?
+  dateDepot     DateTime?
+  dateObtention DateTime?
+  notes         String?
+  documentsJson Json?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum VehicleStatus {
+  EN_STOCK
+  EN_VENTE
+  RESERVE
+  VENDU
+  EN_REPARATION
+}
+
+enum Carburant {
+  ESSENCE
+  DIESEL
+  HYBRIDE
+  ELECTRIQUE
+  HYDROGENE
+  AUTRE
+}
+
+enum Boite {
+  MANUELLE
+  AUTOMATIQUE
+}
+
+enum Carrosserie {
+  BERLINE
+  BREAK
+  SUV
+  COUPE
+  CABRIOLET
+  MONOSPACE
+  UTILITAIRE
+  CAMIONNETTE
+  PICKUP
+  AUTRE
+}
+
+enum CostType {
+  ACHAT
+  TRANSPORT
+  REPARATION
+  CONTROLE_TECHNIQUE
+  CARTE_GRISE
+  COMMISSION
+  AUTRE
+}
+
+enum CustomerType {
+  PARTICULIER
+  PROFESSIONNEL
+}
+
+enum RegistrationStatus {
+  A_CONSTITUER
+  DEPOSE
+  EN_ATTENTE_ANTS
+  OBTENU
+  BLOQUE
+}
